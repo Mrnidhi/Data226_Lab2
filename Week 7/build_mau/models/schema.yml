@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: session_summary
+    description: "Per-session aggregates joined from user_session_channel and session_timestamp."
+    columns:
+      - name: sessionId
+        description: "Unique session identifier."
+        tests:
+          - not_null
+          - unique
