@@ -1,0 +1,7 @@
+sources:
+  - name: raw
+    schema: RAW
+    tables:
+      - name: stock_data
+        identifier: STOCK_DATA
+

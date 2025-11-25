@@ -1,0 +1,14 @@
+stock_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: SFEDU02-LVB17920
+      user: MAGPIE
+      password: "{{ env_var('DBT_PASSWORD') }}" 
+      role: TRAINING_ROLE
+      warehouse: MAGPIE_WH
+      database: USER_DB_MAGPIE
+      schema: RAW
+      threads: 4
+      client_session_keep_alive: False
