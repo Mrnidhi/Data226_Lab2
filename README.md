@@ -8,6 +8,8 @@ I built a small end‑to‑end pipeline that:
 - automates everything with **Airflow**
 - and visualizes the results in **Preset** (Superset).
 
+- This project presents the design and implementation of an end-to-end data analytics pipeline for automating the extraction, transformation, and visualization of financial market data. Using Apache Airflow, stock price data from the Alpha Vantage API is ingested daily into Snowflake through an idempotent ETL process that ensures accuracy and prevents duplication. The transformed analytical model, developed using dbt, computes key technical indicators—including Simple Moving Averages (SMA 5/10/20), Relative Strength Index (RSI-14), Daily Returns, and Price Momentum—using SQL window functions and reproducible modular logic. These enriched metrics serve as the foundation for a business intelligence dashboard built in Preset (Apache Superset), enabling interactive and insightful analysis of stock trends, momentum shifts, and bullish/bearish trading signals. The resulting system demonstrates the effectiveness of a modern ELT architecture, combining automation, reproducibility, and advanced analytics to support data-driven financial decision-making.
+
 ### 1. What the pipeline does
 - Calls the Alpha Vantage API for a few tickers (e.g. `AAPL`, `MSFT`, `GOOGL`).
 - Writes the raw daily price data into a Snowflake table.
