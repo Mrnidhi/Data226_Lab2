@@ -1,73 +1,103 @@
-## Data 226 – Lab 2: Stock Analytics Pipeline
+# Data 226 – Lab 2: Stock Analytics Pipeline
 
-This project is my solution for **Lab 2** in Data 226.  
-I built a small end‑to‑end pipeline that:
-- pulls daily stock prices from **Alpha Vantage**
-- stores them in **Snowflake**
-- transforms them with **dbt**
-- automates everything with **Airflow**
-- and visualizes the results in **Preset** (Superset).
+End-to-end data pipeline for stock market analysis using Alpha Vantage, Snowflake, dbt, Airflow, and Preset.
 
-- This project presents the design and implementation of an end-to-end data analytics pipeline for automating the extraction, transformation, and visualization of financial market data. Using Apache Airflow, stock price data from the Alpha Vantage API is ingested daily into Snowflake through an idempotent ETL process that ensures accuracy and prevents duplication. The transformed analytical model, developed using dbt, computes key technical indicators—including Simple Moving Averages (SMA 5/10/20), Relative Strength Index (RSI-14), Daily Returns, and Price Momentum—using SQL window functions and reproducible modular logic. These enriched metrics serve as the foundation for a business intelligence dashboard built in Preset (Apache Superset), enabling interactive and insightful analysis of stock trends, momentum shifts, and bullish/bearish trading signals. The resulting system demonstrates the effectiveness of a modern ELT architecture, combining automation, reproducibility, and advanced analytics to support data-driven financial decision-making.
+## Architecture
 
-### 1. What the pipeline does
-- Calls the Alpha Vantage API for a few tickers (e.g. `AAPL`, `MSFT`, `GOOGL`).
-- Writes the raw daily price data into a Snowflake table.
-- Uses dbt to:
-  - create a clean staging view: `stg_stock_prices`
-  - build a technical indicators table: `stock_technical_indicators`  
-    (simple moving averages, daily returns, and a basic bullish/bearish trend flag).
-- Runs all steps in order through a single Airflow DAG so it can be scheduled.
+```
+Alpha Vantage API → Airflow (ETL) → Snowflake (RAW) → dbt (Transform) → Snowflake (ANALYTICS) → Preset Dashboard
+```
 
-### 2. Main files and folders
-- **Airflow**
-  - DAG file: `airflow/dags/etl_pipeline.py`  
-    DAG id in the UI: `stock_analytics_lab2`
-- **dbt project**
-  - Root: `dbt/stock_analytics/`
-  - Staging model: `models/staging/stg_stock_prices.sql`
-  - Marts model: `models/marts/stock_technical_indicators.sql`
-- **Docker / infrastructure**
-  - Local stack for Airflow + Postgres: `docker-compose.yaml`
+## Tech Stack
 
-### 3. How ETL and ELT are implemented
-- **ETL (Extract–Transform–Load) with Airflow + Snowflake**
-  - Extract: a Python task in `etl_pipeline.py` calls the Alpha Vantage API and builds a clean `pandas` DataFrame.
-  - Transform (light): the same task does basic type casting (dates, floats, ints).
-  - Load: the task uses the Airflow `SnowflakeHook` to:
-    - create the raw target table if it does not exist
-    - stage data into a temp table
-    - `MERGE` from the temp table into `USER_DB_MAGPIE.RAW.STOCK_DATA` (upsert by symbol + date).
-- **ELT (Extract–Load–Transform) with dbt + Snowflake**
-  - dbt reads directly from the raw Snowflake table as a **source**.
-  - `stg_stock_prices` is a dbt **staging view** that standardizes column names and exposes a clean base.
-  - `stock_technical_indicators` is a dbt **marts table** that does the heavier transforms:
-    moving averages, daily returns, and a trend label.
+| Component | Tool |
+|-----------|------|
+| Data Source | Alpha Vantage API |
+| Orchestration | Apache Airflow 2.10 |
+| Warehouse | Snowflake |
+| Transformation | dbt-core 1.8 |
+| Visualization | Preset (Superset) |
+| Infrastructure | Docker Compose |
 
-### 4. How to run the pipeline
-1. From the project root, start the containers:
-   ```bash
-   docker compose up -d
-   ```
-2. Open the Airflow web UI (see `docker-compose.yaml`, typically `http://localhost:8081`).
-3. In Airflow:
-   - Add a Variable `ALPHA_VANTAGE_KEY` with your API key.
-   - Create a Connection `snowflake_conn` that points to your Snowflake account  
-     (database `USER_DB_MAGPIE`, with the right user/role/warehouse).
-4. Turn on and trigger the DAG **`stock_analytics_lab2`**.
-5. In Snowflake, you should then see:
-   - raw data in `USER_DB_MAGPIE.RAW.STOCK_DATA`
-   - transformed data in `USER_DB_MAGPIE.ANALYTICS.STOCK_TECHNICAL_INDICATORS`
+## Project Structure
 
-### 5. Dashboard in Preset (Superset)
-- Preset is connected to the same Snowflake database.
-- In Preset, I created a dataset on the dbt model  
-  `USER_DB_MAGPIE.ANALYTICS.STOCK_TECHNICAL_INDICATORS`.
-- On top of this dataset, I built a dashboard that includes:
-  - price and volume trends by symbol
-  - moving‑average trend signal (bullish vs. bearish)
-  - daily returns over time
+```
+├── airflow/
+│   ├── dags/etl_pipeline.py    # Main DAG
+│   ├── Dockerfile
+│   └── requirements.txt
+├── dbt/stock_analytics/
+│   ├── models/
+│   │   ├── staging/stg_stock_prices.sql
+│   │   └── marts/stock_technical_indicators.sql
+│   ├── snapshots/stock_prices_snapshot.sql
+│   ├── tests/volume_is_positive.sql
+│   ├── profiles.yml
+│   └── dbt_project.yml
+└── docker-compose.yaml
+```
 
-In summary, this repo shows a full but compact data pipeline:  
-**API → Snowflake → dbt models → Airflow orchestration → Preset dashboard**.
-# Data226_Lab2
+## Pipeline Flow
+
+### ETL Phase (Airflow)
+1. Extract daily prices from Alpha Vantage for AAPL, MSFT, GOOGL
+2. Load into Snowflake using MERGE (upsert)
+
+### ELT Phase (dbt)
+1. `stg_stock_prices` – staging view over raw data
+2. `stock_technical_indicators` – marts table with:
+   - Moving averages (SMA 5/10/20)
+   - Price momentum & daily returns
+   - RSI (14-period)
+   - Trend signal (BULLISH/BEARISH)
+
+### Data Quality (dbt test)
+- Not null checks on symbol, date, close, volume
+- Volume must be >= 0
+
+### Historical Tracking (dbt snapshot)
+- Captures changes to close and volume over time
+- Stored in `SNAPSHOTS.STOCK_PRICES_SNAPSHOT`
+
+## Output Schema
+
+| Column | Description |
+|--------|-------------|
+| symbol | Stock ticker |
+| date | Trading date |
+| open, high, low, close | Price data |
+| volume | Trading volume |
+| prev_close | Previous day close |
+| price_momentum | Dollar change |
+| daily_return | Percentage change |
+| sma_5, sma_10, sma_20 | Moving averages |
+| rsi_14 | Relative Strength Index |
+| trend_signal | BULLISH or BEARISH |
+
+## How to Run
+
+```bash
+# Start containers
+docker compose up -d
+
+# Access Airflow UI at http://localhost:8081
+# Username: airflow / Password: airflow
+
+# Set these in Airflow:
+# - Variable: ALPHA_VANTAGE_KEY
+# - Connection: snowflake_conn
+
+# Trigger DAG: stock_analytics_lab2
+```
+
+## Dashboard
+
+Preset connects to Snowflake and visualizes:
+- Price trends by symbol
+- RSI indicators with overbought/oversold zones
+- Moving average crossovers
+- Daily returns distribution
+
+---
+
+**Course:** SJSU Data 226 – Data Warehousing
