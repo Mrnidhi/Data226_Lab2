@@ -15,3 +15,5 @@ data/raw/*
 data/processed/*
 screenshots/*
 
+# Docs (keep local only)
+db.docx
